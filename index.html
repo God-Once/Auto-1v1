@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto 1v1</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
+        #lobby { display: flex; flex-direction: column; align-items: center; }
+        .title { font-size: 3rem; font-weight: bold; letter-spacing: 5px; margin-bottom: 40px; text-transform: uppercase; }
+        .entry-btn { padding: 12px 60px; font-size: 1.2rem; background: none; border: 2px solid #fff; color: #fff; cursor: pointer; transition: 0.3s; }
+        .entry-btn:hover { background: #fff; color: #000; }
+        #char-selection { display: none; flex-direction: column; align-items: center; width: 100%; height: 100%; padding-top: 50px; }
+        .instruction { font-size: 1.5rem; margin-bottom: 30px; color: #aaa; }
+        .char-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; width: 90%; max-width: 700px; }
+        .char-card { position: relative; background: #1a1a1a; border: 3px solid #333; height: 120px; display: flex; align-items: center; padding: 0 25px; cursor: pointer; border-radius: 15px; transition: all 0.2s ease; }
+        .char-card.selected-1 { border-color: #3498db; box-shadow: 0 0 15px rgba(52, 152, 219, 0.5); transform: scale(1.02); }
+        .char-card.selected-1::after { content: "1P"; position: absolute; top: 10px; right: 15px; color: #3498db; font-weight: bold; }
+        .char-card.selected-2 { border-color: #e74c3c; box-shadow: 0 0 15px rgba(231, 76, 60, 0.5); transform: scale(1.02); }
+        .char-card.selected-2::after { content: "2P"; position: absolute; top: 10px; right: 15px; color: #e74c3c; font-weight: bold; }
+        .char-img { width: 75px; height: 75px; border-radius: 50%; margin-right: 20px; flex-shrink: 0; }
+        .lime { background: #b5d344; }
+        .skin-color { background-color: #ffead0; }
+        .char-info { font-size: 1.3rem; font-weight: bold; }
+        .tooltip { visibility: hidden; position: absolute; z-index: 100; top: 115%; left: 50%; transform: translateX(-50%); background: rgba(20, 20, 20, 0.95); border: 1px solid #555; padding: 15px; width: 200px; border-radius: 8px; font-size: 0.9rem; opacity: 0; transition: 0.3s; pointer-events: none; }
+        .char-card:hover .tooltip { visibility: visible; opacity: 1; }
+        .stat-val { color: #ffcc00; font-weight: bold; }
+        .skill-title { color: #5dade2; font-weight: bold; display: block; margin-top: 8px; border-top: 1px solid #444; padding-top: 8px; }
+        #start-match-btn { position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%); padding: 15px 80px; font-size: 1.5rem; font-weight: bold; background: #333; border: none; color: #666; cursor: not-allowed; border-radius: 50px; transition: 0.3s; }
+        #start-match-btn.active { background: #fff; color: #000; cursor: pointer; box-shadow: 0 0 20px rgba(255,255,255,0.4); }
+        #arena-container { display: none; position: relative; width: 72vmin; height: 72vmin; max-width: 540px; max-height: 540px; }
+        #arena { width: 100%; height: 100%; border: 4px solid #fff; border-radius: 50%; background: radial-gradient(circle, #222 0%, #000 70%); position: relative; overflow: hidden; box-shadow: 0 0 50px rgba(255,255,255,0.1); }
+        
+        .unit { position: absolute; width: 15.75%; height: 15.75%; border-radius: 50%; transform: translate(-50%, -50%); will-change: left, top; z-index: 10; display: flex; align-items: center; justify-content: center; }
+        .unit-1 { border: 3px solid #3498db; }
+        .unit-2 { border: 3px solid #e74c3c; }
+        .player-label { position: absolute; bottom: -85px; left: 50%; transform: translateX(-50%); text-align: center; width: 200px; pointer-events: none; }
+        .hp-display { font-size: 1.2rem; font-weight: bold; color: #fff; text-shadow: 1px 1px 2px #000; }
+        .name-display { font-size: 0.9rem; color: #aaa; margin-top: 2px; font-weight: bold; }
+        .skill-display { font-size: 0.75rem; color: #5dade2; margin-top: 1px; }
+        .projectile { position: absolute; width: 36px; height: 15.12px; background: #fff; transform-origin: center; z-index: 5; border-radius: 2px; }
+        .bow-icon { position: absolute; width: 118.9%; height: 118.9%; pointer-events: none; overflow: visible; left: 50%; top: 50%; transform-origin: center center; }
+
+        .dmg-text {
+            position: absolute; font-weight: bold; font-size: 1rem; color: #ffffff;
+            pointer-events: none; z-index: 50; white-space: nowrap;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+        }
+
+        #countdown { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 8rem; font-weight: bold; color: #fff; z-index: 1000; pointer-events: none; text-shadow: 0 0 30px rgba(255,255,255,0.5); display: none; }
+        #fever-msg { position: fixed; top: 20%; left: 50%; transform: translateX(-50%); font-size: 2rem; font-weight: bold; color: #ffcc00; z-index: 500; display: none; text-shadow: 0 0 10px rgba(255, 204, 0, 0.8); animation: pulse 1s infinite; }
+        #win-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 2000; }
+        #win-text { font-size: 5rem; font-weight: bold; text-transform: uppercase; margin-bottom: 20px; }
+        .restart-btn { padding: 12px 50px; font-size: 1.3rem; font-weight: bold; background: #fff; color: #000; border: none; cursor: pointer; border-radius: 50px; transition: 0.3s; }
+        .restart-btn:hover { transform: scale(1.1); background: #3498db; color: #fff; }
+        @keyframes pulse { 0% { opacity: 0.7; } 50% { opacity: 1; } 100% { opacity: 0.7; } }
+        .show { display: flex !important; }
+        .hide { display: none !important; }
+    </style>
+</head>
+<body>
+    <div id="lobby">
+        <div class="title">Auto 1v1</div>
+        <button class="entry-btn" onclick="openSelection()">GAME START</button>
+    </div>
+    <div id="char-selection">
+        <div class="instruction">Select Two Characters</div>
+        <div class="char-grid">
+            <div class="char-card" id="char-1" onclick="selectChar('char-1', 'lime', 110, 4, 0, 'for friend list')">
+                <div class="char-img lime"></div>
+                <div class="char-info">for friend list</div>
+                <div class="tooltip">체력: <span class="stat-val">110</span><br>공격력: <span class="stat-val">4</span><br>방어력: <span class="stat-val">0</span></div>
+            </div>
+            <div class="char-card" id="char-2" onclick="selectChar('char-2', 'skin-color', 90, 1, 8, 'milksha_2009')">
+                <div class="char-img skin-color"></div>
+                <div class="char-info">milksha_2009</div>
+                <div class="tooltip">체력: <span class="stat-val">90</span><br>공격력: <span class="stat-val">1</span><br>방어력: <span class="stat-val">0</span><br><span class="skill-title">기술 - 활</span>공격력: <span class="stat-val">8</span><br>쿨타임: <span class="stat-val">2초</span></div>
+            </div>
+        </div>
+        <button id="start-match-btn" onclick="startBattle()">MATCH START</button>
+    </div>
+    <div id="fever-msg">SPEED UP (x1.5)!</div>
+    <div id="countdown"></div>
+    <div id="win-screen">
+        <div id="win-text">PLAYER WIN</div>
+        <button class="restart-btn" onclick="restartGame()">RESTART</button>
+    </div>
+    <div id="arena-container">
+        <div id="arena">
+            <div id="p1-unit" class="unit unit-1"><div class="player-label"><div id="p1-hp" class="hp-display"></div><div id="p1-name" class="name-display"></div><div id="p1-skill" class="skill-display"></div></div></div>
+            <div id="p2-unit" class="unit unit-2"><div class="player-label"><div id="p2-hp" class="hp-display"></div><div id="p2-name" class="name-display"></div><div id="p2-skill" class="skill-display"></div></div></div>
+        </div>
+    </div>
+
+    <script>
+        let selected = [null, null], selectedColors = [null, null], initialStats = [{}, {}];
+        let projectiles = [], floatingTexts = [];
+        let p1Data = { x: 30, y: 50, vx: 0, vy: 0, radius: 7.87, hp: 0, atk: 0, sAtk: 0, lastSkill: 0, name: "" };
+        let p2Data = { x: 70, y: 50, vx: 0, vy: 0, radius: 7.87, hp: 0, atk: 0, sAtk: 0, lastSkill: 0, name: "" };
+        let lastTime = 0, gameActiveTime = 0, isFever = false, isGameOver = false;
+
+        function openSelection() { document.getElementById('lobby').classList.add('hide'); document.getElementById('char-selection').classList.add('show'); }
+        
+        function selectChar(charId, colorClass, hp, atk, sAtk, name) {
+            const card = document.getElementById(charId);
+            if (selected[0] === charId) { selected[0] = null; card.classList.remove('selected-1'); } 
+            else if (selected[1] === charId) { selected[1] = null; card.classList.remove('selected-2'); } 
+            else {
+                if (!selected[0]) {
+                    selected[0] = charId; selectedColors[0] = colorClass;
+                    initialStats[0] = { hp, atk, sAtk, id: charId, name };
+                    card.classList.add('selected-1');
+                } else if (!selected[1]) {
+                    selected[1] = charId; selectedColors[1] = colorClass;
+                    initialStats[1] = { hp, atk, sAtk, id: charId, name };
+                    card.classList.add('selected-2');
+                }
+            }
+            updateStartButton();
+        }
+
+        function updateStartButton() { const btn = document.getElementById('start-match-btn'); selected[0] && selected[1] ? btn.classList.add('active') : btn.classList.remove('active'); }
+
+        function startBattle() {
+            if (!(selected[0] && selected[1])) return;
+            document.getElementById('char-selection').className = 'hide';
+            document.getElementById('arena-container').style.display = 'block';
+            document.getElementById('countdown').style.display = 'block';
+            [p1Data, p2Data].forEach((p, i) => {
+                p.x = i === 0 ? 30 : 70; p.y = 50; p.hp = initialStats[i].hp; p.atk = initialStats[i].atk; p.sAtk = initialStats[i].sAtk; p.id = initialStats[i].id; p.name = initialStats[i].name; p.lastSkill = 0; p.vx = 0; p.vy = 0;
+                document.getElementById(`p${i+1}-name`).innerText = p.name;
+                const unit = document.getElementById(`p${i+1}-unit`);
+                unit.classList.add(selectedColors[i]);
+                if (p.id === 'char-2') {
+                    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                    svg.setAttribute("class", "bow-icon"); svg.setAttribute("viewBox", "-10 -10 20 20");
+                    svg.innerHTML = `<path d="M0,-10 A10,10 0 0,1 0,10" fill="none" stroke="white" stroke-width="1.5" /><line x1="0" y1="-10" x2="0" y2="10" stroke="white" stroke-width="0.8" />`;
+                    unit.appendChild(svg);
+                }
+            });
+            updateUI();
+            const sequence = ['3', '2', '1', 'GO!']; let i = 0;
+            const timer = setInterval(() => {
+                if (i < sequence.length) document.getElementById('countdown').innerText = sequence[i++];
+                else { clearInterval(timer); document.getElementById('countdown').style.display = 'none'; lastTime = performance.now(); requestAnimationFrame(gameLoop); }
+            }, 1000);
+        }
+
+        function restartGame() {
+            isGameOver = false; isFever = false; gameActiveTime = 0; projectiles.forEach(a => a.el.remove()); projectiles = []; floatingTexts.forEach(t => t.el.remove()); floatingTexts = [];
+            p1Data = { x: 30, y: 50, vx: 0, vy: 0, radius: 7.87, hp: 0, atk: 0, sAtk: 0, lastSkill: 0, name: "" };
+            p2Data = { x: 70, y: 50, vx: 0, vy: 0, radius: 7.87, hp: 0, atk: 0, sAtk: 0, lastSkill: 0, name: "" };
+            document.getElementById('win-screen').style.display = 'none'; document.getElementById('arena-container').style.display = 'none'; document.getElementById('char-selection').className = 'show';
+            [1, 2].forEach(num => {
+                const unit = document.getElementById(`p${num}-unit`); unit.className = `unit unit-${num}`;
+                const bow = unit.querySelector('.bow-icon'); if (bow) bow.remove();
+                document.getElementById(`p${num}-skill`).innerText = ""; document.getElementById(`p${num}-hp`).innerText = "";
+            });
+            selected = [null, null];
+            document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected-1', 'selected-2'));
+            updateStartButton();
+        }
+
+        function createDmgText(x, y, val) {
+            if (val <= 0) return;
+            const el = document.createElement('div'); el.className = 'dmg-text'; el.innerText = `-${val}`;
+            document.getElementById('arena').appendChild(el);
+            floatingTexts.push({ el: el, x: x, y: y, vx: (Math.random() - 0.5) * 20, vy: -30, life: 1.0 });
+        }
+
+        function spawnArrow(shooter, target) {
+            const angle = Math.atan2(target.y - shooter.y, target.x - shooter.x);
+            const arrowSpeed = isFever ? 144 : 96;
+            const arrow = { x: shooter.x, y: shooter.y, vx: Math.cos(angle) * arrowSpeed, vy: Math.sin(angle) * arrowSpeed, angle: angle * (180 / Math.PI), damage: shooter.sAtk, owner: shooter, radius: 1.44 };
+            const el = document.createElement('div'); el.className = 'projectile';
+            document.getElementById('arena').appendChild(el); arrow.el = el; projectiles.push(arrow);
+        }
+
+        function updateUI() {
+            [p1Data, p2Data].forEach((p, idx) => {
+                const unit = document.getElementById(`p${idx+1}-unit`);
+                unit.style.left = p.x + '%'; unit.style.top = p.y + '%';
+                if (p.hp > 0 || isGameOver) document.getElementById(`p${idx+1}-hp`).innerText = Math.max(0, Math.ceil(p.hp));
+                if (p.id === 'char-2') {
+                    const bow = unit.querySelector('.bow-icon');
+                    if (bow) { const target = idx === 0 ? p2Data : p1Data; bow.style.transform = `translate(-50%, -50%) rotate(${Math.atan2(target.y - p.y, target.x - p.x) * (180 / Math.PI)}deg)`; }
+                    document.getElementById(`p${idx+1}-skill`).innerText = `활 (대기: ${Math.max(0, (2.0 - p.lastSkill)).toFixed(1)}s)`;
+                }
+            });
+            if (!isGameOver && (p1Data.hp <= 0 || p2Data.hp <= 0)) {
+                isGameOver = true; const winner = p1Data.hp <= 0 ? p2Data.name : p1Data.name;
+                document.getElementById('win-text').innerText = `${winner} WIN`;
+                document.getElementById('win-text').style.color = p1Data.hp <= 0 ? "#e74c3c" : "#3498db";
+                document.getElementById('win-screen').style.display = 'flex';
+            }
+        }
+
+        function gameLoop(timestamp) {
+            if (isGameOver) return;
+            let dt = Math.min((timestamp - lastTime) / 1000, 0.1); lastTime = timestamp; gameActiveTime += dt;
+            
+            if (!isFever && gameActiveTime >= 20) {
+                isFever = true; document.getElementById('fever-msg').style.display = 'block';
+                p1Data.vx *= 1.5; p1Data.vy *= 1.5; p2Data.vx *= 1.5; p2Data.vy *= 1.5;
+                setTimeout(() => document.getElementById('fever-msg').style.display = 'none', 3000);
+            }
+
+            let skillDt = isFever ? dt * 1.5 : dt;
+
+            if (p1Data.vx === 0 && p1Data.vy === 0) {
+                const speed = 65;
+                const angle1 = Math.random() * Math.PI * 2;
+                const symmetricBase = angle1 + Math.PI;
+                const minDiff = Math.PI / 6;
+                const randomOffset = (Math.random() > 0.5 ? 1 : -1) * (minDiff + Math.random() * (Math.PI / 2));
+                const angle2 = symmetricBase + randomOffset;
+                p1Data.vx = Math.cos(angle1) * speed; p1Data.vy = Math.sin(angle1) * speed;
+                p2Data.vx = Math.cos(angle2) * speed; p2Data.vy = Math.sin(angle2) * speed;
+            }
+
+            [p1Data, p2Data].forEach((p, idx) => {
+                p.x += p.vx * dt; p.y += p.vy * dt;
+                if (p.id === 'char-2') { 
+                    p.lastSkill += skillDt; 
+                    if (p.lastSkill >= 2.0) { spawnArrow(p, idx === 0 ? p2Data : p1Data); p.lastSkill = 0; } 
+                }
+                const distC = Math.sqrt((p.x-50)**2 + (p.y-50)**2);
+                if (distC > 50 - p.radius) {
+                    const nx = (p.x-50)/distC, ny = (p.y-50)/distC;
+                    const dot = p.vx*nx + p.vy*ny; p.vx -= 2*dot*nx; p.vy -= 2*dot*ny;
+                    p.x = 50 + nx*(50-p.radius); p.y = 50 + ny*(50-p.radius);
+                }
+            });
+
+            const dx = p2Data.x - p1Data.x, dy = p2Data.y - p1Data.y, dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < p1Data.radius + p2Data.radius) {
+                createDmgText(p1Data.x, p1Data.y, p2Data.atk); createDmgText(p2Data.x, p2Data.y, p1Data.atk);
+                p1Data.hp -= p2Data.atk; p2Data.hp -= p1Data.atk;
+                const nx = dx/dist, ny = dy/dist;
+                const rvx = p2Data.vx - p1Data.vx, rvy = p2Data.vy - p1Data.vy;
+                const velNormal = rvx*nx + rvy*ny;
+                if (velNormal < 0) { const impulse = -(2) * velNormal / 2; p1Data.vx -= impulse * nx; p1Data.vy -= impulse * ny; p2Data.vx += impulse * nx; p2Data.vy += impulse * ny; }
+                const overlap = (p1Data.radius + p2Data.radius - dist) / 2;
+                p1Data.x -= nx*overlap; p1Data.y -= ny*overlap; p2Data.x += nx*overlap; p2Data.y += ny*overlap;
+            }
+
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const a = projectiles[i]; a.x += a.vx*dt; a.y += a.vy*dt;
+                a.el.style.left = a.x+'%'; a.el.style.top = a.y+'%'; a.el.style.transform = `translate(-50%, -50%) rotate(${a.angle}deg)`;
+                const target = a.owner === p1Data ? p2Data : p1Data;
+                if (Math.sqrt((a.x-target.x)**2 + (a.y-target.y)**2) < target.radius + a.radius) { createDmgText(target.x, target.y, a.damage); target.hp -= a.damage; a.el.remove(); projectiles.splice(i, 1); }
+                else if (Math.sqrt((a.x-50)**2 + (a.y-50)**2) > 49) { a.el.remove(); projectiles.splice(i, 1); }
+            }
+
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const t = floatingTexts[i]; t.life -= dt;
+                if (t.life <= 0) { t.el.remove(); floatingTexts.splice(i, 1); continue; }
+                t.x += t.vx * dt; t.y += t.vy * dt;
+                t.el.style.left = t.x + '%'; t.el.style.top = t.y + '%'; t.el.style.opacity = t.life;
+            }
+            updateUI(); requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>
