@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auto 1v1 - Fever Upgrade</title>
+    <title>Auto 1v1 - Colored Projectiles</title>
     <style>
+        /* 기존 스타일 유지 */
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
         #lobby { display: flex; flex-direction: column; align-items: center; }
         .title { font-size: 3rem; font-weight: bold; letter-spacing: 5px; margin-bottom: 40px; text-transform: uppercase; }
@@ -30,17 +31,20 @@
         .skill-detail { color: #a569bd; font-weight: bold; }
         #start-match-btn { position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%); padding: 15px 80px; font-size: 1.5rem; font-weight: bold; background: #333; border: none; color: #666; cursor: not-allowed; border-radius: 50px; transition: 0.3s; }
         #start-match-btn.active { background: #fff; color: #000; cursor: pointer; box-shadow: 0 0 20px rgba(255,255,255,0.4); }
+        
         #arena-container { display: none; position: relative; width: 72vmin; height: 72vmin; max-width: 540px; max-height: 540px; }
         #arena { width: 100%; height: 100%; border: 4px solid #fff; border-radius: 50%; background: radial-gradient(circle, #222 0%, #000 70%); position: relative; overflow: hidden; box-shadow: 0 0 50px rgba(255,255,255,0.1); }
         .unit { position: absolute; width: 15.75%; height: 15.75%; border-radius: 50%; transform: translate(-50%, -50%); will-change: left, top; z-index: 10; display: flex; align-items: center; justify-content: center; }
         .unit-1 { border: 3px solid #3498db; }
         .unit-2 { border: 3px solid #e74c3c; }
         .unit.awakened { border-color: #a569bd !important; box-shadow: 0 0 20px #a569bd; }
-        .player-label { position: absolute; bottom: -85px; left: 50%; transform: translateX(-50%); text-align: center; width: 200px; pointer-events: none; }
-        .hp-display { font-size: 1.2rem; font-weight: bold; color: #fff; text-shadow: 1px 1px 2px #000; }
-        .name-display { font-size: 0.9rem; color: #aaa; margin-top: 2px; font-weight: bold; }
-        .skill-display { font-size: 0.75rem; color: #5dade2; margin-top: 1px; }
-        .skill-display.awaken { color: #a569bd; }
+
+        .player-label { position: absolute; bottom: -85px; left: 50%; transform: translateX(-50%); text-align: center; width: 220px; pointer-events: none; display: flex; flex-direction: column; align-items: center; }
+        .hp-display { font-size: 1.25rem; font-weight: bold; color: #fff; text-shadow: 1px 1px 2px #000; order: 1; }
+        .name-display { font-size: 0.9rem; color: #aaa; font-weight: bold; order: 2; margin-top: -2px; }
+        .skill-display { font-size: 0.75rem; color: #5dade2; order: 3; margin-top: 1px; min-height: 1.1em; }
+        .skill-display.awaken { color: #a569bd; } /* 크로우 각성 전용 보라색 */
+
         .projectile { position: absolute; width: 36px; height: 15.12px; background: #fff; transform-origin: center; z-index: 5; border-radius: 2px; }
         .bow-icon { position: absolute; width: 118.9%; height: 118.9%; pointer-events: none; overflow: visible; left: 50%; top: 50%; transform-origin: center center; }
         .dmg-text { position: absolute; font-weight: bold; font-size: 1rem; color: #ffffff; pointer-events: none; z-index: 50; white-space: nowrap; text-shadow: 1px 1px 3px rgba(0,0,0,0.8); }
@@ -108,10 +112,11 @@
         let p1Data = {}, p2Data = {};
         let lastTime = 0, gameActiveTime = 0, feverLevel = 0, isGameOver = false;
         let animationFrameId = null;
+        let countdownInterval = null;
 
         function initData() {
-            p1Data = { x: 30, y: 50, vx: 0, vy: 0, radius: 7.87, hp: 0, atk: 0, def: 0, sAtk: 0, lastSkill: 0, name: "", isAwake: false, awakeTimer: 0, id: "" };
-            p2Data = { x: 70, y: 50, vx: 0, vy: 0, radius: 7.87, hp: 0, atk: 0, def: 0, sAtk: 0, lastSkill: 0, name: "", isAwake: false, awakeTimer: 0, id: "" };
+            p1Data = { x: 30, y: 50, vx: 0, vy: 0, radius: 7.87, hp: 0, atk: 0, def: 0, sAtk: 0, lastSkill: 0, name: "", isAwake: false, awakeTimer: 0, id: "", color: "" };
+            p2Data = { x: 70, y: 50, vx: 0, vy: 0, radius: 7.87, hp: 0, atk: 0, def: 0, sAtk: 0, lastSkill: 0, name: "", isAwake: false, awakeTimer: 0, id: "", color: "" };
             projectiles = []; floatingTexts = []; gameActiveTime = 0; feverLevel = 0; isGameOver = false;
         }
         initData();
@@ -131,9 +136,11 @@
 
         function restartGame() {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            if (countdownInterval) clearInterval(countdownInterval);
             document.getElementById('win-screen').style.display = 'none';
             document.getElementById('arena-container').style.display = 'none';
             document.getElementById('fever-msg').style.display = 'none';
+            document.getElementById('countdown').style.display = 'none'; 
             document.getElementById('char-selection').className = 'show';
             const arena = document.getElementById('arena');
             const elementsToRemove = arena.querySelectorAll('.projectile, .dmg-text');
@@ -145,12 +152,26 @@
             initData();
         }
 
+        // 색상 클래스를 실제 CSS 색상 값으로 변환하는 함수
+        function getColorValue(colorClass) {
+            switch(colorClass) {
+                case 'lime': return '#b5d344';
+                case 'skin-color': return '#ffead0';
+                case 'light-gray': return '#cccccc';
+                default: return '#ffffff';
+            }
+        }
+
         function startBattle() {
             if (!(selected[0] && selected[1])) return;
             initData();
             document.getElementById('char-selection').className = 'hide';
             document.getElementById('arena-container').style.display = 'block';
-            document.getElementById('countdown').style.display = 'block';
+            
+            const countdownEl = document.getElementById('countdown');
+            countdownEl.innerText = ""; 
+            countdownEl.style.display = 'block';
+
             const speed = 65;
             const angle1 = Math.random() * Math.PI * 2;
             let angle2; let isSymmetric = true;
@@ -163,6 +184,7 @@
                 p.x = i === 0 ? 30 : 70; p.y = 50; 
                 p.hp = initialStats[i].hp; p.atk = initialStats[i].atk; p.def = initialStats[i].def; 
                 p.sAtk = initialStats[i].sAtk; p.id = initialStats[i].id; p.name = initialStats[i].name; 
+                p.color = getColorValue(selectedColors[i]); // 캐릭터 색상 저장
                 p.vx = Math.cos(i === 0 ? angle1 : angle2) * speed; 
                 p.vy = Math.sin(i === 0 ? angle1 : angle2) * speed;
                 document.getElementById(`p${i+1}-name`).innerText = p.name;
@@ -178,16 +200,16 @@
             });
             updateUI(); 
             
-            // 카운트다운 로직 수정: go가 먼저 나오지 않도록 보장
             const sequence = ['3', '2', '1', 'GO!'];
             let currentIdx = 0;
-            const timer = setInterval(() => {
+            if (countdownInterval) clearInterval(countdownInterval);
+            countdownInterval = setInterval(() => {
                 if (currentIdx < sequence.length) {
-                    document.getElementById('countdown').innerText = sequence[currentIdx];
+                    countdownEl.innerText = sequence[currentIdx];
                     currentIdx++;
                 } else {
-                    clearInterval(timer);
-                    document.getElementById('countdown').style.display = 'none';
+                    clearInterval(countdownInterval);
+                    countdownEl.style.display = 'none';
                     lastTime = performance.now();
                     animationFrameId = requestAnimationFrame(gameLoop);
                 }
@@ -206,10 +228,11 @@
             let arrowSpeedMultiplier = 1;
             if (feverLevel === 1) arrowSpeedMultiplier = 1.5;
             if (feverLevel === 2) arrowSpeedMultiplier = 2.0;
-            
             const arrowSpeed = 115.2 * arrowSpeedMultiplier;
             const arrow = { x: shooter.x, y: shooter.y, vx: Math.cos(angle) * arrowSpeed, vy: Math.sin(angle) * arrowSpeed, angle: angle * (180 / Math.PI), damage: shooter.sAtk, owner: shooter, radius: 1.44 };
             const el = document.createElement('div'); el.className = 'projectile';
+            // [수정] 화살 색상을 발사한 캐릭터의 색상으로 설정
+            el.style.backgroundColor = shooter.color; 
             document.getElementById('arena').appendChild(el); arrow.el = el; projectiles.push(arrow);
         }
 
@@ -221,8 +244,10 @@
                 unit.style.left = p.x + '%'; unit.style.top = p.y + '%';
                 document.getElementById(`p${idx+1}-hp`).innerText = Math.max(0, Math.ceil(p.hp));
                 const skillLabel = document.getElementById(`p${idx+1}-skill`);
+                
                 if (p.id === 'char-2') {
-                    skillLabel.className = "skill-display"; 
+                    // [수정] 밀크샤 스킬 텍스트는 보라색 클래스를 지우고 기본 색상으로 유지
+                    skillLabel.classList.remove("awaken"); 
                     const bow = unit.querySelector('.bow-icon');
                     if (bow) { const target = idx === 0 ? p2Data : p1Data; bow.style.transform = `translate(-50%, -50%) rotate(${Math.atan2(target.y - p.y, target.x - p.x) * (180 / Math.PI)}deg)`; }
                     skillLabel.innerText = isGameOver ? "" : `활 (대기: ${Math.max(0, (2.0 - p.lastSkill)).toFixed(1)}s)`;
@@ -230,19 +255,24 @@
                 else if (p.id === 'char-3') {
                     if (p.isAwake) {
                         skillLabel.innerText = `각성&그랩! (${p.awakeTimer.toFixed(1)}s)`;
-                        skillLabel.classList.add("awaken");
+                        // [수정] 크로우 각성시에만 보라색 클래스 추가
+                        skillLabel.classList.add("awaken"); 
                         unit.classList.add('awakened');
                         const target = idx === 0 ? p2Data : p1Data;
                         const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
                         line.setAttribute("x1", p.x + "%"); line.setAttribute("y1", p.y + "%");
                         line.setAttribute("x2", target.x + "%"); line.setAttribute("y2", target.y + "%");
-                        line.setAttribute("stroke", "#a569bd"); line.setAttribute("stroke-width", "2.5");
+                        line.setAttribute("stroke", "#ffffff"); line.setAttribute("stroke-width", "2.5");
                         grabSvg.appendChild(line);
                     } else {
                         skillLabel.innerText = isGameOver ? "" : `각성 (대기: ${Math.max(0, (7.0 - p.lastSkill)).toFixed(1)}s)`;
                         skillLabel.classList.remove("awaken"); unit.classList.remove('awakened');
                     }
-                } else { skillLabel.className = "skill-display"; skillLabel.innerText = ""; }
+                } else { 
+                    // 기술 없는 캐릭터(for friend list 등) - 빈 칸을 유지하여 높이 정렬
+                    skillLabel.classList.remove("awaken"); 
+                    skillLabel.innerText = isGameOver ? "" : " "; // 공백 문자로 높이 차지
+                }
             });
             if (!isGameOver && (p1Data.hp <= 0 || p2Data.hp <= 0)) {
                 isGameOver = true; 
@@ -257,7 +287,6 @@
             if (isGameOver) return;
             let dt = Math.min((timestamp - lastTime) / 1000, 0.1); lastTime = timestamp; gameActiveTime += dt;
             
-            // 피버 타임 로직: 15초(1.5배), 45초(2배)
             if (feverLevel === 0 && gameActiveTime >= 15) {
                 feverLevel = 1;
                 document.getElementById('fever-msg').innerText = "SPEED UP (1.5x)!";
@@ -268,7 +297,6 @@
                 feverLevel = 2;
                 document.getElementById('fever-msg').innerText = "MAX SPEED (2.0x)!!";
                 document.getElementById('fever-msg').style.display = 'block';
-                // 1.5배였던 속도를 2배(초기 대비)로 만들기 위해 1.33배 추가 곱셈
                 p1Data.vx *= 1.333; p1Data.vy *= 1.333; p2Data.vx *= 1.333; p2Data.vy *= 1.333;
                 setTimeout(() => { document.getElementById('fever-msg').style.display = 'none'; }, 2000);
             }
