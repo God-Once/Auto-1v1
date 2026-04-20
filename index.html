@@ -56,8 +56,6 @@
         #win-text { font-size: 5rem; font-weight: bold; text-transform: uppercase; margin-bottom: 20px; }
         .restart-btn { padding: 12px 50px; font-size: 1.3rem; font-weight: bold; background: #fff; color: #000; border: none; cursor: pointer; border-radius: 50px; transition: 0.3s; }
         #grab-line { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; }
-        #speed-display { position: fixed; top: 20px; right: 20px; font-size: 1.5rem; font-weight: bold; color: #ffcc00; z-index: 1001; text-shadow: 0 0 10px #000; display: none; }
-        #speed-up-notice { position: fixed; top: 15%; left: 50%; transform: translateX(-50%); font-size: 2.5rem; font-weight: bold; color: #ff3300; z-index: 1100; text-shadow: 0 0 15px #000; display: none; animation: flash 0.5s infinite alternate; }
         #bottom-rematch-btn { position: absolute; bottom: -80px; left: 50%; transform: translateX(-50%); padding: 10px 40px; font-size: 1.1rem; background: #444; color: #fff; border: 1px solid #777; border-radius: 5px; cursor: pointer; display: none; z-index: 100; transition: 0.2s; }
         #bottom-rematch-btn:hover { background: #fff; color: #000; }
         
@@ -75,7 +73,6 @@
             transform-origin: bottom center; 
         }
         
-        @keyframes flash { from { opacity: 1; } to { opacity: 0.5; } }
         @keyframes explode-ani { 0% { transform: translate(-50%, -50%) scale(0); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1); opacity: 0; } }
         @keyframes explode-pulse { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.1); } }
         
@@ -130,8 +127,6 @@
         <button id="start-match-btn" onclick="startBattle()">MATCH START</button>
     </div>
 
-    <div id="speed-display">1.0x</div>
-    <div id="speed-up-notice">SPEED UP! 1.5x</div>
     <div id="countdown"></div>
     <div id="win-screen">
         <div id="win-text">PLAYER WIN</div>
@@ -157,7 +152,6 @@
         let lastTime = 0, isGameOver = false, isCounting = false;
         let animationFrameId = null;
         let countdownInterval = null;
-        let elapsedBattleTime = 0;
 
         function initData() {
             const defaultObj = (x) => ({
@@ -167,7 +161,7 @@
             });
             p1Data = defaultObj(30);
             p2Data = defaultObj(70);
-            projectiles = []; floatingTexts = []; isGameOver = false; elapsedBattleTime = 0; isCounting = false;
+            projectiles = []; floatingTexts = []; isGameOver = false; isCounting = false;
         }
         initData();
 
@@ -189,34 +183,24 @@
         function restartGame() {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             if (countdownInterval) clearInterval(countdownInterval);
-            
             const arena = document.getElementById('arena');
             arena.querySelectorAll('.projectile, .dmg-text, .explosion-effect, .explosion-range-indicator, .orbit-ball, .melee-range-indicator, .lightsaber, .bow-icon').forEach(el => el.remove());
-            
             document.getElementById('grab-line').innerHTML = "";
             document.getElementById('win-screen').style.display = 'none';
             document.getElementById('arena-container').style.display = 'none';
             document.getElementById('countdown').style.display = 'none'; 
-            document.getElementById('speed-display').style.display = 'none'; 
-            document.getElementById('speed-up-notice').style.display = 'none';
             document.getElementById('bottom-rematch-btn').style.display = 'none';
             document.getElementById('char-selection').className = 'show';
-            
             [1, 2].forEach(num => {
                 const u = document.getElementById(`p${num}-unit`);
-                u.style.display = 'none';
-                u.classList.remove('awakened', 'exploding');
-                u.style.backgroundImage = 'none';
+                u.style.display = 'none'; u.classList.remove('awakened', 'exploding'); u.style.backgroundImage = 'none';
                 u.querySelectorAll('.lightsaber, .bow-icon').forEach(s => s.remove());
                 document.getElementById(`p${num}-skill`).innerText = "";
             });
-
             if (selected[0]) document.getElementById(selected[0]).classList.remove('selected-1');
             if (selected[1]) document.getElementById(selected[1]).classList.remove('selected-2');
-            
             selected = [null, null]; selectedColors = [null, null]; initialStats = [{}, {}];
-            updateStartButton();
-            initData();
+            updateStartButton(); initData();
         }
 
         function getColorValue(colorClass) {
@@ -256,25 +240,17 @@
             initData();
             document.getElementById('char-selection').className = 'hide';
             document.getElementById('arena-container').style.display = 'block';
-            document.getElementById('speed-display').style.display = 'block';
-            
             [p1Data, p2Data].forEach((p, i) => {
                 p.hp = initialStats[i].hp; p.maxHp = initialStats[i].maxHp; p.atk = initialStats[i].atk; 
                 p.def = initialStats[i].def; p.baseDef = p.def; p.sAtk = initialStats[i].sAtk; p.id = initialStats[i].id; p.name = initialStats[i].name; 
                 p.color = getColorValue(selectedColors[i]); 
-                
                 const unit = document.getElementById(`p${i+1}-unit`);
-                unit.className = `unit ${selectedColors[i]}`;
-                unit.style.display = 'flex';
+                unit.className = `unit ${selectedColors[i]}`; unit.style.display = 'flex';
                 document.getElementById(`p${i+1}-name`).innerText = p.name;
-                
-                const rangeInd = document.getElementById(`p${i+1}-melee-range`);
-                rangeInd.style.display = 'none';
-                
+                const rangeInd = document.getElementById(`p${i+1}-melee-range`); rangeInd.style.display = 'none';
                 if (p.id === 'char-4') unit.style.backgroundImage = `url(${cosmostarImgData})`;
                 if (p.id === 'char-5') {
-                    p.ballAngle = Math.PI / 2;
-                    const r = p.radius * 4.0;
+                    p.ballAngle = Math.PI / 2; const r = p.radius * 4.0;
                     p.ballX = p.x + Math.cos(p.ballAngle) * r; p.ballY = p.y + Math.sin(p.ballAngle) * r;
                     const ballContainer = document.createElement('div');
                     ballContainer.id = `p${i+1}-ball`; ballContainer.className = 'orbit-ball';
@@ -282,8 +258,7 @@
                     document.getElementById('arena').appendChild(ballContainer);
                 }
                 if (p.id === 'char-6') {
-                    rangeInd.style.display = 'block';
-                    const rangeSize = p.radius * 3.5; // 1.75배 사거리 적용 (지름 기준 3.5)
+                    rangeInd.style.display = 'block'; const rangeSize = p.radius * 3.5;
                     rangeInd.style.width = rangeSize + '%'; rangeInd.style.height = rangeSize + '%';
                     unit.appendChild(createLightsaberSvg());
                 }
@@ -294,7 +269,6 @@
                     unit.appendChild(svg);
                 }
             });
-
             const speed = 65;
             [p1Data, p2Data].forEach((p, i) => {
                 const target = i === 0 ? p2Data : p1Data;
@@ -302,30 +276,18 @@
                 const finalAngle = baseAngle + (Math.random() - 0.5) * (Math.PI / 2);
                 p.vx = Math.cos(finalAngle) * speed; p.vy = Math.sin(finalAngle) * speed;
             });
-
             updateUI();
             isCounting = true;
             const countdownEl = document.getElementById('countdown');
             countdownEl.style.display = 'block';
-            const sequence = ['3', '2', '1', ' ']; 
-            let currentIdx = 0;
-            
-            // 카운트 중에도 애니메이션 업데이트 (가시 공 표시를 위해)
-            const countAnim = () => {
-                if (!isCounting) return;
-                updateUI();
-                requestAnimationFrame(countAnim);
-            };
+            const sequence = ['3', '2', '1', ' ']; let currentIdx = 0;
+            const countAnim = () => { if (!isCounting) return; updateUI(); requestAnimationFrame(countAnim); };
             requestAnimationFrame(countAnim);
-
             countdownInterval = setInterval(() => {
                 if (currentIdx < sequence.length) { countdownEl.innerText = sequence[currentIdx]; currentIdx++; } 
                 else { 
-                    clearInterval(countdownInterval); 
-                    countdownEl.style.display = 'none'; 
-                    isCounting = false;
-                    lastTime = performance.now(); 
-                    animationFrameId = requestAnimationFrame(gameLoop); 
+                    clearInterval(countdownInterval); countdownEl.style.display = 'none'; isCounting = false;
+                    lastTime = performance.now(); animationFrameId = requestAnimationFrame(gameLoop); 
                 }
             }, 1000);
         }
@@ -344,7 +306,6 @@
                 unit.style.left = p.x + '%'; unit.style.top = p.y + '%';
                 document.getElementById(`p${idx+1}-hp`).innerText = Math.max(0, Math.ceil(p.hp));
                 const skillLabel = document.getElementById(`p${idx+1}-skill`);
-                
                 if (p.id === 'char-6') {
                     const rangeInd = document.getElementById(`p${idx+1}-melee-range`);
                     rangeInd.style.left = p.x + '%'; rangeInd.style.top = p.y + '%';
@@ -355,8 +316,7 @@
                     skillLabel.innerText = `활 (${Math.max(0, 2-p.lastSkill).toFixed(1)}s)`;
                 } else if (p.id === 'char-3') {
                     if (p.isAwake) {
-                        skillLabel.innerText = "각성 중!"; skillLabel.style.color = "#a569bd";
-                        unit.classList.add('awakened');
+                        skillLabel.innerText = "각성 중!"; skillLabel.style.color = "#a569bd"; unit.classList.add('awakened');
                         const target = idx === 0 ? p2Data : p1Data;
                         grabSvg.innerHTML += `<line x1="${p.x}%" y1="${p.y}%" x2="${target.x}%" y2="${target.y}%" stroke="rgba(255,255,255,0.6)" stroke-width="2" stroke-dasharray="4" />`;
                     } else { 
@@ -367,11 +327,7 @@
                     skillLabel.innerText = p.isExploding ? "자폭 준비!!!" : `자폭 (${Math.max(0, 6-p.lastSkill).toFixed(1)}s)`;
                 } else if (p.id === 'char-5') {
                     const ball = document.getElementById(`p${idx+1}-ball`);
-                    if(ball) { 
-                        ball.style.left = p.ballX + '%'; 
-                        ball.style.top = p.ballY + '%'; 
-                        ball.style.display = 'block';
-                    }
+                    if(ball) { ball.style.left = p.ballX + '%'; ball.style.top = p.ballY + '%'; ball.style.display = 'block'; }
                     grabSvg.innerHTML += `<line x1="${p.x}%" y1="${p.y}%" x2="${p.ballX}%" y2="${p.ballY}%" stroke="#fff" stroke-width="2" stroke-dasharray="5, 5" />`;
                 }
             });
@@ -388,17 +344,12 @@
 
         function gameLoop(timestamp) {
             if (isGameOver || isCounting) return;
-            let realDt = Math.min((timestamp - lastTime) / 1000, 0.1); lastTime = timestamp;
-            elapsedBattleTime += realDt;
-            let gameSpeed = (elapsedBattleTime >= 15) ? 1.5 : 1.0;
-            document.getElementById('speed-display').innerText = gameSpeed.toFixed(1) + "x";
-            let dt = realDt * gameSpeed; 
+            let dt = Math.min((timestamp - lastTime) / 1000, 0.1); lastTime = timestamp;
 
             [p1Data, p2Data].forEach((p, idx) => {
                 const target = idx === 0 ? p2Data : p1Data;
                 if (!p.isExploding) { p.x += p.vx * dt; p.y += p.vy * dt; }
                 p.lastSkill += dt;
-                
                 if (p.id === 'char-2' && p.lastSkill >= 2) { spawnArrow(p, target); p.lastSkill = 0; }
                 else if (p.id === 'char-3') {
                     if (p.isAwake) {
@@ -408,28 +359,21 @@
                     } else if (p.lastSkill >= 7) { p.isAwake = true; p.awakeTimer = 7; p.lastSkill = 0; p.atk = 7; p.def = 2; }
                 } else if (p.id === 'char-4' && !p.isExploding && p.lastSkill >= 6) { 
                     p.isExploding = true; p.def = 20;
-                    const unitEl = document.getElementById(`p${idx+1}-unit`);
-                    unitEl.classList.add('exploding');
-                    const rangeInd = document.createElement('div');
-                    rangeInd.className = 'explosion-range-indicator';
-                    const rangeSize = p.radius * 6;
-                    rangeInd.style.width = rangeSize + '%'; rangeInd.style.height = rangeSize + '%';
-                    rangeInd.style.left = p.x + '%'; rangeInd.style.top = p.y + '%';
-                    document.getElementById('arena').appendChild(rangeInd);
+                    const unitEl = document.getElementById(`p${idx+1}-unit`); unitEl.classList.add('exploding');
+                    const rangeInd = document.createElement('div'); rangeInd.className = 'explosion-range-indicator';
+                    const rangeSize = p.radius * 6; rangeInd.style.width = rangeSize + '%'; rangeInd.style.height = rangeSize + '%';
+                    rangeInd.style.left = p.x + '%'; rangeInd.style.top = p.y + '%'; document.getElementById('arena').appendChild(rangeInd);
                     setTimeout(() => {
                         if (isGameOver) return;
                         p.isExploding = false; p.def = p.baseDef; unitEl.classList.remove('exploding'); rangeInd.remove();
                         const effect = document.createElement('div'); effect.className = 'explosion-effect';
                         effect.style.width = rangeSize + '%'; effect.style.height = rangeSize + '%';
-                        effect.style.left = p.x + '%'; effect.style.top = p.y + '%';
-                        document.getElementById('arena').appendChild(effect);
+                        effect.style.left = p.x + '%'; effect.style.top = p.y + '%'; document.getElementById('arena').appendChild(effect);
                         setTimeout(() => effect.remove(), 400);
                         const d = Math.sqrt((target.x - p.x)**2 + (target.y - p.y)**2);
-                        if (d < (rangeSize/2) + target.radius) {
-                            const dmg = Math.max(1, p.sAtk - target.def); target.hp -= dmg; createDmgText(target.x, target.y, dmg);
-                        }
+                        if (d < (rangeSize/2) + target.radius) { const dmg = Math.max(1, p.sAtk - target.def); target.hp -= dmg; createDmgText(target.x, target.y, dmg); }
                         p.hp -= 5; createDmgText(p.x, p.y, 5); p.lastSkill = 0;
-                    }, 1000 / gameSpeed); 
+                    }, 1000); 
                 } else if (p.id === 'char-5') {
                     p.ballAngle += (Math.PI * 2 / 2.0) * dt; 
                     const r = p.radius * 4.0; p.ballX = p.x + Math.cos(p.ballAngle)*r; p.ballY = p.y + Math.sin(p.ballAngle)*r;
@@ -439,27 +383,22 @@
                     }
                 } else if (p.id === 'char-6') {
                     const dx = target.x - p.x, dy = target.y - p.y, dist = Math.sqrt(dx*dx + dy*dy);
-                    if (dist < p.radius * 2.75 && p.lastSkill >= 3) { // 1.75배 사거리 로직
-                        const unitEl = document.getElementById(`p${idx+1}-unit`);
-                        const saber = unitEl.querySelector('.lightsaber');
+                    if (dist < p.radius * 2.75 && p.lastSkill >= 3) {
+                        const unitEl = document.getElementById(`p${idx+1}-unit`); const saber = unitEl.querySelector('.lightsaber');
                         if (saber) {
-                            const angleToTarget = Math.atan2(dy, dx); 
-                            const targetDeg = angleToTarget * 180 / Math.PI + 90;
-                            saber.style.display = 'block';
-                            saber.style.transform = `translate(-50%, -100%) rotate(${targetDeg - 60}deg)`;
+                            const angleToTarget = Math.atan2(dy, dx); const targetDeg = angleToTarget * 180 / Math.PI + 90;
+                            saber.style.display = 'block'; saber.style.transform = `translate(-50%, -100%) rotate(${targetDeg - 60}deg)`;
                             saber.style.transition = `transform 0.15s ease-out`;
                             requestAnimationFrame(() => { saber.style.transform = `translate(-50%, -100%) rotate(${targetDeg + 60}deg)`; });
                             setTimeout(() => { 
                                 if (isGameOver) return;
-                                saber.style.transition = 'none'; saber.style.display = 'none'; 
-                                saber.style.transform = `translate(-50%, -100%) rotate(-60deg)`;
+                                saber.style.transition = 'none'; saber.style.display = 'none'; saber.style.transform = `translate(-50%, -100%) rotate(-60deg)`;
                                 const dmg = Math.max(1, p.sAtk - target.def); target.hp -= dmg; createDmgText(target.x, target.y, dmg);
-                            }, 300 / gameSpeed); 
+                            }, 300); 
                         }
                         p.lastSkill = 0;
                     }
                 }
-                
                 const distC = Math.sqrt((p.x-50)**2 + (p.y-50)**2);
                 if (distC > 50 - p.radius) {
                     const nx = (p.x-50)/distC, ny = (p.y-50)/distC, dot = p.vx*nx + p.vy*ny;
