@@ -162,7 +162,7 @@
         let lastTime = 0, isGameOver = false, isCounting = false;
         let animationFrameId = null;
         let countdownInterval = null;
-        let explosionTimers = []; // 자폭 타이머 관리를 위한 배열
+        let explosionTimers = [];
 
         function initData() {
             const defaultObj = (x) => ({
@@ -208,29 +208,18 @@
             selected[0] && selected[1] ? btn.classList.add('active') : btn.classList.remove('active'); 
         }
 
-        // 재시작 함수: 게임 엔진을 완전히 멈추고 초기화함
         function restartGame() {
-            // 1. 애니메이션 루프 즉시 중단
-            if (animationFrameId) {
-                cancelAnimationFrame(animationFrameId);
-                animationFrameId = null;
-            }
-            
-            // 2. 카운트다운 타이머 중단
-            if (countdownInterval) {
-                clearInterval(countdownInterval);
-                countdownInterval = null;
-            }
-
-            // 3. 자폭 대기열 등 모든 setTimeout 중단
-            explosionTimers.forEach(timer => clearTimeout(timer));
+            if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+            if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+            explosionTimers.forEach(timer => {
+                if (typeof timer === 'number') clearTimeout(timer);
+                else if (timer && timer.type === 'interval') clearInterval(timer.id);
+            });
             explosionTimers = [];
             
-            // 4. 화면 요소 물리적 제거
             const arena = document.getElementById('arena');
             arena.querySelectorAll('.projectile, .dmg-text, .explosion-effect, .explosion-range-indicator, .orbit-ball, .melee-range-indicator, .lightsaber, .bow-icon').forEach(el => el.remove());
             
-            // 5. UI 가시성 초기화
             document.getElementById('grab-line').innerHTML = "";
             document.getElementById('win-screen').style.display = 'none';
             document.getElementById('arena-container').style.display = 'none';
@@ -238,7 +227,6 @@
             document.getElementById('bottom-rematch-btn').style.display = 'none';
             document.getElementById('char-selection').className = 'show';
             
-            // 6. 캐릭터 상태 초기화
             [1, 2].forEach(num => {
                 const u = document.getElementById(`p${num}-unit`);
                 u.style.display = 'none'; 
@@ -247,7 +235,6 @@
                 document.getElementById(`p${num}-skill`).innerText = "";
             });
             
-            // 7. 선택 상태 초기화
             if (selected[0]) document.getElementById(selected[0]).classList.remove('selected-1');
             if (selected[1]) document.getElementById(selected[1]).classList.remove('selected-2');
             
@@ -274,7 +261,7 @@
             }
             return svg;
         }
-        
+
         function createLightsaberSvg() {
             const svgNS = "http://www.w3.org/2000/svg";
             const svg = document.createElementNS(svgNS, "svg");
@@ -426,7 +413,12 @@
 
             [p1Data, p2Data].forEach((p, idx) => {
                 const target = idx === 0 ? p2Data : p1Data;
-                if (!p.isExploding) { p.x += p.vx * dt; p.y += p.vy * dt; }
+                
+                // 자폭 중 순간이동 버그 수정: 자폭 중에도 위치는 업데이트하되 속도만 감속
+                let moveFactor = p.isExploding ? 0.3 : 1.0;
+                p.x += p.vx * dt * moveFactor; 
+                p.y += p.vy * dt * moveFactor;
+                
                 p.lastSkill += dt;
 
                 if (p.id === 'char-2' && p.lastSkill >= 2) { spawnArrow(p, target); p.lastSkill = 0; }
@@ -445,15 +437,22 @@
                         p.isAwake = true; p.awakeTimer = 7; p.lastSkill = 0; p.atk = 7; p.def = 2; 
                     }
                 } else if (p.id === 'char-4' && !p.isExploding && p.lastSkill >= 6) { 
+                    // 자폭 로직 수정: 표시기가 실시간으로 따라오도록 interval 추가
                     p.isExploding = true; p.def = 20;
                     const unitEl = document.getElementById(`p${idx+1}-unit`); unitEl.classList.add('exploding');
                     const rangeInd = document.createElement('div'); rangeInd.className = 'explosion-range-indicator';
                     const rangeSize = p.radius * 6; rangeInd.style.width = rangeSize + '%'; rangeInd.style.height = rangeSize + '%';
-                    rangeInd.style.left = p.x + '%'; rangeInd.style.top = p.y + '%'; document.getElementById('arena').appendChild(rangeInd);
+                    document.getElementById('arena').appendChild(rangeInd);
                     
+                    const followId = setInterval(() => {
+                        if (!p.isExploding || isGameOver) { clearInterval(followId); rangeInd.remove(); return; }
+                        rangeInd.style.left = p.x + '%'; rangeInd.style.top = p.y + '%';
+                    }, 16);
+                    explosionTimers.push({ type: 'interval', id: followId });
+
                     const t1 = setTimeout(() => {
-                        if (isGameOver || !animationFrameId) { rangeInd.remove(); return; }
-                        p.isExploding = false; p.def = p.baseDef; unitEl.classList.remove('exploding'); rangeInd.remove();
+                        if (isGameOver || !animationFrameId) { p.isExploding = false; return; }
+                        p.isExploding = false; p.def = p.baseDef; unitEl.classList.remove('exploding');
                         const effect = document.createElement('div'); effect.className = 'explosion-effect';
                         effect.style.width = rangeSize + '%'; effect.style.height = rangeSize + '%';
                         effect.style.left = p.x + '%'; effect.style.top = p.y + '%'; document.getElementById('arena').appendChild(effect);
@@ -495,6 +494,7 @@
                     }
                 }
 
+                // 경기장 경계 처리
                 const distC = Math.sqrt((p.x-50)**2 + (p.y-50)**2);
                 if (distC > 50 - p.radius) {
                     const nx = (p.x-50)/distC, ny = (p.y-50)/distC;
@@ -504,6 +504,7 @@
                 }
             });
 
+            // 유닛 간 충돌 처리
             const dx = p2Data.x - p1Data.x, dy = p2Data.y - p1Data.y, dist = Math.sqrt(dx*dx + dy*dy);
             if (dist < p1Data.radius + p2Data.radius && !p1Data.isExploding && !p2Data.isExploding) {
                 const d1 = Math.max(1, p2Data.atk - p1Data.def), d2 = Math.max(1, p1Data.atk - p2Data.def);
@@ -519,6 +520,7 @@
                 }
             }
 
+            // 투사체 처리
             for (let i = projectiles.length - 1; i >= 0; i--) {
                 const a = projectiles[i]; a.x += a.vx*dt; a.y += a.vy*dt; a.el.style.left = a.x+'%'; a.el.style.top = a.y+'%';
                 const target = a.owner === p1Data ? p2Data : p1Data;
@@ -528,6 +530,7 @@
                 } else if (Math.sqrt((a.x-50)**2 + (a.y-50)**2) > 49.5) { a.el.remove(); projectiles.splice(i, 1); }
             }
 
+            // 데미지 텍스트 처리
             for (let i = floatingTexts.length - 1; i >= 0; i--) {
                 const t = floatingTexts[i]; t.life -= dt; t.x += t.vx*dt; t.y += t.vy*dt;
                 t.el.style.left = t.x+'%'; t.el.style.top = t.y+'%'; t.el.style.opacity = t.life;
